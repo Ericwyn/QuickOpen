@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Handler;
+import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -15,6 +16,7 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -23,8 +25,16 @@ import java.util.List;
 
 public class LauncherActivity extends AppCompatActivity {
 
+    public List<MyAppInfo> mLocalInstallApps = null;
+
     private ListView lv_app_list;
+    private SearchView searchView;
+
+
     private AppAdapter mAppAdapter;
+
+
+
     public Handler mHandler = new Handler();
 
     public SharedPreferences sharedPreferences;
@@ -37,13 +47,19 @@ public class LauncherActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 //        getActionBar().setTitle("请选择想要启动的应用");
 
-        setTitle("选择要启动的应用");
+//        setTitle("选择要启动的应用");
+
+        ActionBar bar = getSupportActionBar();
+        if (bar != null) bar.hide();
+
         sharedPreferences = getSharedPreferences("QuickOpen", Context.MODE_PRIVATE);
 
         editor = sharedPreferences.edit();
 
         setContentView(R.layout.activity_launcher);
-        lv_app_list = (ListView) findViewById(R.id.lv_app_list);
+        lv_app_list = findViewById(R.id.lv_app_list);
+        searchView = findViewById(R.id.list_search_view);
+
         mAppAdapter = new AppAdapter();
         lv_app_list.setAdapter(mAppAdapter);
         lv_app_list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -69,9 +85,32 @@ public class LauncherActivity extends AppCompatActivity {
         });
         initAppList();
 
+        searchView.setOnCloseListener(new SearchView.OnCloseListener() {
+            @Override
+            public boolean onClose() {
+                mAppAdapter.setData(mLocalInstallApps);
+                mAppAdapter.notifyDataSetChanged();
+                return false;
+            }
+        });
+
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String s) {
+                List<MyAppInfo> myAppInfos = searchAppInfo(s);
+                mAppAdapter.setData(myAppInfos);
+                mAppAdapter.notifyDataSetChanged();
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String s) {
+                return false;
+            }
+        });
+
     }
 
-    public static List<MyAppInfo> mLocalInstallApps = null;
 
     public static List<MyAppInfo> scanLocalInstallAppList(PackageManager packageManager) {
         List<MyAppInfo> myAppInfos = new ArrayList<MyAppInfo>();
@@ -111,6 +150,7 @@ public class LauncherActivity extends AppCompatActivity {
                 mHandler.post(new Runnable() {
                     @Override
                     public void run() {
+                        mLocalInstallApps = appInfos;
                         mAppAdapter.setData(appInfos);
                     }
                 });
@@ -118,6 +158,18 @@ public class LauncherActivity extends AppCompatActivity {
         }.start();
     }
 
+    private List<MyAppInfo> searchAppInfo(String searchKey) {
+        if (searchKey.trim().equals("")) {
+            return mLocalInstallApps;
+        }
+        List<MyAppInfo> resInfo = new ArrayList<>();
+        for (MyAppInfo info : mLocalInstallApps) {
+            if (info.getAppName().contains(searchKey) || info.getPackageName().contains(searchKey)) {
+                resInfo.add(info);
+            }
+        }
+        return resInfo;
+    }
 
     class AppAdapter extends BaseAdapter {
 
